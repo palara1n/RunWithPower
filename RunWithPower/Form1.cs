@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Windows.Forms;
 using System.Diagnostics;
-using System.IO; // Required for checking file existence
+using System.IO;
+using System.ServiceProcess;
 
 namespace RunWithPower
 {
@@ -16,31 +17,33 @@ namespace RunWithPower
         {
             string arguments = $"-s -i \"{textBox1.Text}\"";
 
-            if (comboBox1.Text == "Not chosen")
+            switch (comboBox1.Text)
             {
-                MessageBox.Show("Please choose an option!");
-            }
-            else if (comboBox1.Text == "Invoker")
-            {
-                arguments = $"-i \"{textBox1.Text}\""; // No special privileges for Invoker
-                RunPsExec(arguments);
-            }
-            else if (comboBox1.Text == "Administrator")
-            {
-                arguments = $"-h \"{textBox1.Text}\""; // Run with Administrator privileges
-                RunPsExec(arguments);
-            }
-            else if (comboBox1.Text == "System")
-            {;
-                RunPsExec(arguments);
-            }
-            else if (comboBox1.Text == "TrustedInstaller")
-            {
-                RunPsExec(arguments);
-            }
-            else
-            {
-                MessageBox.Show("Invalid");
+                case "Not chosen":
+                    MessageBox.Show("Please choose an option!");
+                    break;
+
+                case "Invoker":
+                    arguments = $"-i \"{textBox1.Text}\""; // No special privileges for Invoker
+                    RunPsExec(arguments);
+                    break;
+
+                case "Administrator":
+                    arguments = $"-h \"{textBox1.Text}\""; // Run with Administrator privileges
+                    RunPsExec(arguments);
+                    break;
+
+                case "System":
+                    RunPsExec(arguments);
+                    break;
+
+                case "TrustedInstaller":
+                    RunAsTrustedInstaller(textBox1.Text);
+                    break;
+
+                default:
+                    MessageBox.Show("Invalid option selected.");
+                    break;
             }
         }
 
@@ -48,19 +51,46 @@ namespace RunWithPower
         {
             try
             {
-                // Check if PsExec.exe exists
                 if (!File.Exists("PsExec.exe"))
                 {
                     MessageBox.Show("Error: PsExec.exe not found in the application folder!");
                     return;
                 }
 
-                // Start PsExec.exe with arguments
                 Process.Start("PsExec.exe", args);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error running PsExec: {ex.Message}");
+            }
+        }
+
+        private void RunAsTrustedInstaller(string applicationPath)
+        {
+            try
+            {
+                ServiceController sc = new ServiceController("TrustedInstaller");
+
+                if (sc.Status != ServiceControllerStatus.Running)
+                {
+                    sc.Start();
+                    sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(10));
+                }
+
+                Process[] proc = Process.GetProcessesByName("TrustedInstaller");
+
+                if (proc.Length > 0)
+                {
+                    IamYourDaddy.Run(proc[0].Id, applicationPath);
+                }
+                else
+                {
+                    MessageBox.Show("Error: TrustedInstaller process not found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error running as TrustedInstaller: {ex.Message}");
             }
         }
     }
